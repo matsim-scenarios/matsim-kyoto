@@ -18,15 +18,14 @@
 
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.github.matsim-scenarios</groupId>
-	<artifactId>matsim-template</artifactId>
+	<artifactId>matsim-kyoto</artifactId>
 	<version>1.x-SNAPSHOT</version>
 
-	<name>MATSim Template Model</name>
-	<description>A transport model of template</description>
+	<name>MATSim Open Kyoto</name>
+	<description>A transport model of Kyoto</description>
 
 	<properties>
-		<!-- FIXME: change main class -->
-		<main.class>org.matsim.run.RunTemplateScenario</main.class>
+		<main.class>org.matsim.run.OpenKyotoScenario</main.class>
 
 		<!-- Don't modify, will use the same version as parent -->
 		<matsim.version>${project.parent.version}</matsim.version>

@@ -1,10 +1,12 @@
 
-N := template
+N := kyoto
 V := v1.0
-CRS := EPSG:25832
+CRS := EPSG:32653
 
 MEMORY ?= 20G
 JAR := matsim-$(N)-*.jar
+
+kyoto := ../public-svn/matsim/scenarios/countries/jp/kyoto
 
 ifndef SUMO_HOME
 	export SUMO_HOME := $(abspath ../../sumo-1.15.0/)
@@ -63,20 +65,14 @@ input/sumo.net.xml: input/network.osm
 	 --no-internal-links --keep-edges.by-vclass passenger,bicycle\
 	 --remove-edges.by-vclass hov,tram,rail,rail_urban,rail_fast,pedestrian\
 	 --output.original-names --output.street-names\
-	 --proj "+proj=utm +zone=32 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs"\
+	 --proj "+proj=utm +zone=53 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"\
 	 --osm-files $< -o=$@
 
 
-input/$V/$N-$V-network.xml.gz: input/sumo.net.xml
-	$(sc) prepare network-from-sumo $<\
+input/$V/$N-$V-network.xml.gz:
+	$(sc) prepare network-from-sumo $(kyoto)/data/Kyoto_Network_C_2021/network_C.net.xml\
 	 --output $@
 
-	# FIXME: Adjust
-
-	$(sc) prepare network\
-     --shp ../public-svn/matsim/scenarios/countries/de/$N/shp/prepare-network/av-and-drt-area.shp\
-	 --network $@\
-	 --output $@
 
 
 input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
