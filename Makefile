@@ -8,14 +8,10 @@ JAR := matsim-$(N)-*.jar
 
 kyoto := ../public-svn/matsim/scenarios/countries/jp/kyoto
 
-ifndef SUMO_HOME
-	export SUMO_HOME := $(abspath ../../sumo-1.15.0/)
-endif
-
 osmosis := osmosis/bin/osmosis
 
 # Scenario creation tool
-sc := java -Xmx$(MEMORY) -jar $(JAR)
+sc := java -Xmx$(MEMORY) -XX:+UseParallelGC -cp $(JAR) org.matsim.prepare.RunOpenKyotoCalibration
 
 .PHONY: prepare
 
@@ -23,11 +19,10 @@ $(JAR):
 	mvn package
 
 # Required files
-input/network.osm.pbf:
-	curl https://download.geofabrik.de/europe/germany-210701.osm.pbf\
-	  -o input/network.osm.pbf
+input/kansai.osm.pbf:
+	curl https://download.geofabrik.de/asia/japan/kansai-210101.osm.pbf -o $@
 
-input/network.osm: input/network.osm.pbf
+input/network.osm: input/kansai.osm.pbf
 
 	# FIXME: Adjust level of details and area
 
@@ -74,7 +69,6 @@ input/$V/$N-$V-network.xml.gz:
 	 --output $@
 
 
-
 input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
 	# FIXME: Adjust GTFS
 
@@ -89,61 +83,53 @@ input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
 	 --shp ../shared-svn/projects/$N/data/Bayern.zip\
 	 --shp ../shared-svn/projects/$N/data/germany-area/germany-area.shp\
 
-input/freight-trips.xml.gz: input/$V/$N-$V-network.xml.gz
-	# FIXME: Adjust path
 
-	$(sc) extract-freight-trips ../shared-svn/projects/german-wide-freight/v1.2/german-wide-freight-25pct.xml.gz\
-	 --network ../shared-svn/projects/german-wide-freight/original-data/german-primary-road.network.xml.gz\
-	 --input-crs EPSG:5677\
+input/facilities.gpkg: input/kansai.osm.pbf
+	$(sc) prepare facility-shp\
+	 --activity-mapping input/activity_mapping.json\
+	 --input $<\
 	 --target-crs $(CRS)\
-	 --shp ../shared-svn/projects/$N/data/shp/$N.shp --shp-crs $(CRS)\
 	 --output $@
 
-input/$V/prepare-25pct.plans.xml.gz:
-	$(sc) prepare trajectory-to-plans\
-	 --name prepare --sample-size 0.25 --output input/$V\
-	 --population ../shared-svn/projects/$N/matsim-input-files/population.xml.gz\
-	 --attributes  ../shared-svn/projects/$N/matsim-input-files/personAttributes.xml.gz
-
-	$(sc) prepare resolve-grid-coords\
-	 input/$V/prepare-25pct.plans.xml.gz\
-	 --input-crs $(CRS)\
-	 --grid-resolution 300\
-	 --landuse ../matsim-leipzig/scenarios/input/landuse/landuse.shp\
+input/$V/$N-$V-facilities.xml.gz: input/$V/$N-$V-network.xml.gz input/facilities.gpkg
+	$(sc) prepare facilities --network $< --shp $(word 2,$^)\
 	 --output $@
 
-input/$V/$N-$V-25pct.plans-initial.xml.gz: input/freight-trips.xml.gz input/$V/$N-$V-network.xml.gz input/$V/prepare-25pct.plans.xml.gz
-	$(sc) prepare generate-short-distance-trips\
- 	 --population input/$V/prepare-25pct.plans.xml.gz\
- 	 --input-crs $(CRS)\
-	 --shp ../shared-svn/projects/$N/data/shp/$N.shp --shp-crs $(CRS)\
- 	 --num-trips 111111 # FIXME
+# Static population only contains the home locations
+input/$V/$N-static-$V-25pct.plans.xml.gz:
+	# TODO:
 
-	$(sc) prepare adjust-activity-to-link-distances input/$V/prepare-25pct.plans-with-trips.xml.gz\
-	 --shp ../shared-svn/projects/$N/data/shp/$N.shp --shp-crs $(CRS)\
-     --scale 1.15\
-     --input-crs $(CRS)\
-     --network input/$V/$N-$V-network.xml.gz\
-     --output input/$V/prepare-25pct.plans-adj.xml.gz
 
-	$(sc) prepare xy-to-links --network input/$V/$N-$V-network.xml.gz --input input/$V/prepare-25pct.plans-adj.xml.gz --output $@
+# Assigns daily activity chains (without locations)
+$p/$N-activities-$V-25pct.plans.xml.gz: input/$V/$N-static-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+	$(sc) prepare activity-sampling --seed 1 --input $< --output $@ --persons src/main/python/table-persons.csv --activities src/main/python/table-activities.csv
 
-	$(sc) prepare fix-subtour-modes --input $@ --output $@
+	$(sc) prepare assign-reference-population --population $@ --output $@\
+	 --persons src/main/python/table-persons.csv\
+  	 --activities src/main/python/table-activities.csv\
+  	 --shp $(germany)/../matsim-berlin/data/SrV/zones/zones.shp\
+  	 --shp-crs $(CRS)\
+	 --facilities $(word 2,$^)\
+	 --network $(word 3,$^)\
 
-	$(sc) prepare merge-populations $@ $< --output $@
 
-	$(sc) prepare extract-home-coordinates $@ --csv input/$V/$N-$V-homes.csv
+# Assigns locations to the activities
+$p/berlin-initial-$V-25pct.plans.xml.gz: $p/$N-activities-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+	$(sc) prepare init-location-choice\
+	 --input $<\
+	 --output $@\
+	 --facilities $(word 2,$^)\
+	 --network $(word 3,$^)\
+	 --shp $(germany)/vg5000/vg5000_ebenen_0101/VG5000_GEM.shp\
+	 --commuter $(germany)/regionalstatistik/commuter.csv\
 
+	# For debugging and visualization
 	$(sc) prepare downsample-population $@\
-    	 --sample-size 0.25\
-    	 --samples 0.1 0.01\
+		 --sample-size 0.25\
+		 --samples 0.1 0.03 0.01\
 
-
-check: input/$V/$N-$V-25pct.plans-initial.xml.gz
-	$(sc) analysis check-population $<\
- 	 --input-crs $(CRS)\
-	 --shp ../shared-svn/projects/$N/data/shp/$N.shp --shp-crs $(CRS)
 
 # Aggregated target
-prepare: input/$V/$N-$V-25pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
-	echo "Done"
+# TODO:
+#prepare: input/$V/$N-$V-25pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+#	echo "Done"

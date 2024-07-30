@@ -9,8 +9,7 @@
 		<!-- <version>15.0</version> -->
 
 		<!-- PR-labelled release -->
-		<!-- FIXME: Decide on version -->
-		<version>2025.0-PR3332</version>
+		<version>2025.0-PR3350</version>
 
 		<!-- snapshot == not recommended: rather use PR-labelled release!-->
 <!--		<version>2025.0-SNAPSHOT</version>-->
@@ -19,7 +18,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>com.github.matsim-scenarios</groupId>
 	<artifactId>matsim-kyoto</artifactId>
-	<version>1.x-SNAPSHOT</version>
+	<version>1.0-SNAPSHOT</version>
 
 	<name>MATSim Open Kyoto</name>
 	<description>A transport model of Kyoto</description>
@@ -64,6 +63,13 @@
 		</dependency>
 
 		<!-- Custom dependencies -->
+
+		<!-- Uses the demand generation from the Berlin repo -->
+		<dependency>
+			<groupId>com.github.matsim-scenarios</groupId>
+			<artifactId>matsim-berlin</artifactId>
+			<version>70c8076e1e</version>
+		</dependency>
 
 
 		<!-- Include the JUnit testing library.  Not transitive. -->
@@ -170,7 +176,7 @@
 							<goal>shade</goal>
 						</goals>
 						<configuration>
-							<outputFile>${project.basedir}/${project.build.finalName}-${git.commit.id.describe-short}.jar</outputFile>
+							<outputFile>${project.basedir}/${project.build.finalName}-${git.commit.id.describe}.jar</outputFile>
 							<transformers>
 								<!-- The following sets the main class for the executable jar as you otherwise would with the assembly plugin -->
 								<transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
