@@ -66,7 +66,7 @@ input/sumo.net.xml: input/network.osm
 
 input/$V/$N-$V-network.xml.gz:
 	$(sc) prepare network-from-sumo $(kyoto)/data/Kyoto_Network_C_2021/network_C.net.xml\
-	 --output $@
+	  --target-crs $(CRS) --output $@
 
 
 input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
@@ -96,12 +96,16 @@ input/$V/$N-$V-facilities.xml.gz: input/$V/$N-$V-network.xml.gz input/facilities
 	 --output $@
 
 # Static population only contains the home locations
-input/$V/$N-static-$V-25pct.plans.xml.gz:
-	# TODO:
+input/$V/$N-static-$V-10pct.plans.xml.gz: $(kyoto)/data/census_kansai_region.csv $(kyoto)/data/kansai-region-epsg4612.gpkg input/facilities.gpkg
+	$(sc) prepare kyoto-population\
+		--input $<\
+		--shp $(word 2,$^) --shp-crs $(CRS)\
+		--facilities $(word 3,$^) --facilities-attr resident\
+		--output $@
 
 
 # Assigns daily activity chains (without locations)
-$p/$N-activities-$V-25pct.plans.xml.gz: input/$V/$N-static-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+$p/$N-activities-$V-10pct.plans.xml.gz: input/$V/$N-static-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
 	$(sc) prepare activity-sampling --seed 1 --input $< --output $@ --persons src/main/python/table-persons.csv --activities src/main/python/table-activities.csv
 
 	$(sc) prepare assign-reference-population --population $@ --output $@\
@@ -114,7 +118,7 @@ $p/$N-activities-$V-25pct.plans.xml.gz: input/$V/$N-static-$V-25pct.plans.xml.gz
 
 
 # Assigns locations to the activities
-$p/berlin-initial-$V-25pct.plans.xml.gz: $p/$N-activities-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+$p/berlin-initial-$V-10pct.plans.xml.gz: $p/$N-activities-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
 	$(sc) prepare init-location-choice\
 	 --input $<\
 	 --output $@\
