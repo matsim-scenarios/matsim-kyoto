@@ -7,6 +7,7 @@ MEMORY ?= 20G
 JAR := matsim-$(N)-*.jar
 
 kyoto := ../public-svn/matsim/scenarios/countries/jp/kyoto
+confidential := ../shared-svn/projects/matsim-kyoto
 
 osmosis := osmosis/bin/osmosis
 
@@ -24,43 +25,36 @@ input/kansai.osm.pbf:
 
 input/network.osm: input/kansai.osm.pbf
 
-	# FIXME: Adjust level of details and area
-
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways bicycle=yes highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction,residential,unclassified,living_street\
-	 --bounding-polygon file="../shared-svn/projects/$N/data/area.poly"\
+	 --bounding-polygon file="input/area.poly"\
 	 --used-node --wb input/network-detailed.osm.pbf
 
 	$(osmosis) --rb file=$<\
 	 --tf accept-ways highway=motorway,motorway_link,trunk,trunk_link,primary,primary_link,secondary_link,secondary,tertiary,motorway_junction\
-	 --bounding-box top=51.92 left=11.45 bottom=50.83 right=13.36\
 	 --used-node --wb input/network-coarse.osm.pbf
 
-	$(osmosis) --rb file=$<\
-	 --tf accept-ways highway=motorway,motorway_link,motorway_junction,trunk,trunk_link,primary,primary_link\
-	 --used-node --wb input/network-germany.osm.pbf
 
-	$(osmosis) --rb file=input/network-germany.osm.pbf --rb file=input/network-coarse.osm.pbf --rb file=input/network-detailed.osm.pbf\
-  	 --merge --merge\
+	$(osmosis) --rb file=input/network-coarse.osm.pbf --rb file=input/network-detailed.osm.pbf\
+  	 --merge\
   	 --tag-transform file=input/remove-railway.xml\
   	 --wx $@
 
 	rm input/network-detailed.osm.pbf
 	rm input/network-coarse.osm.pbf
-	rm input/network-germany.osm.pbf
-
 
 input/sumo.net.xml: input/network.osm
 
 	$(SUMO_HOME)/bin/netconvert --geometry.remove --ramps.guess --ramps.no-split\
-	 --type-files $(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml,$(SUMO_HOME)/data/typemap/osmNetconvertUrbanDe.typ.xml\
+	 --type-files $(SUMO_HOME)/data/typemap/osmNetconvert.typ.xml\
 	 --tls.guess-signals true --tls.discard-simple --tls.join --tls.default-type actuated\
 	 --junctions.join --junctions.corner-detail 5\
 	 --roundabouts.guess --remove-edges.isolated\
 	 --no-internal-links --keep-edges.by-vclass passenger,bicycle\
 	 --remove-edges.by-vclass hov,tram,rail,rail_urban,rail_fast,pedestrian\
 	 --output.original-names --output.street-names\
-	 --proj "+proj=utm +zone=53 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"\
+	 --proj "+proj=utm +zone=53 +datum=WGS84 +units=m +no_defs"\
+	 --lefthand true
 	 --osm-files $< -o=$@
 
 
