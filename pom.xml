@@ -9,7 +9,7 @@
 		<!-- <version>15.0</version> -->
 
 		<!-- PR-labelled release -->
-		<version>2025.0-PR3350</version>
+		<version>2025.0-PR3390</version>
 
 		<!-- snapshot == not recommended: rather use PR-labelled release!-->
 <!--		<version>2025.0-SNAPSHOT</version>-->
@@ -38,8 +38,7 @@
 		<repository>
 			<id>github</id>
 			<name>GitHub Packages</name>
-			<!-- FIXME: Update Repo -->
-			<url>https://maven.pkg.github.com/matsim-scenarios/matsim-template-scenario</url>
+			<url>https://maven.pkg.github.com/matsim-scenarios/matsim-kyoto</url>
 		</repository>
 	</distributionManagement>
 
@@ -68,7 +67,7 @@
 		<dependency>
 			<groupId>com.github.matsim-scenarios</groupId>
 			<artifactId>matsim-berlin</artifactId>
-			<version>70c8076e1e</version>
+			<version>ce81ea226c</version>
 		</dependency>
 
 

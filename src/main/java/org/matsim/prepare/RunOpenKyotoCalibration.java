@@ -20,7 +20,7 @@ import picocli.CommandLine;
 
 @CommandLine.Command(header = ":: Open Kyoto Calibration ::", version = OpenKyotoScenario.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
-	MergePopulations.class, CreateKyotoPopulation.class,
+	MergePopulations.class, CreateKansaiPopulation.class, CreateDailyPlans.class,
 	ExtractFacilityGeoPkg.class, DownSamplePopulation.class,
 	CreateNetworkFromSumo.class, CreateTransitScheduleFromGtfs.class,
 	CleanNetwork.class, CreateMATSimFacilities.class, InitLocationChoice.class, FilterRelevantAgents.class,

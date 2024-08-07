@@ -53,15 +53,14 @@ input/sumo.net.xml: input/network.osm
 	 --no-internal-links --keep-edges.by-vclass passenger,bicycle\
 	 --remove-edges.by-vclass hov,tram,rail,rail_urban,rail_fast,pedestrian\
 	 --output.original-names --output.street-names\
-	 --proj "+proj=utm +zone=53 +datum=WGS84 +units=m +no_defs"\
-	 --lefthand true
+	 --proj "+proj=utm +zone=53 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"\
+	 --lefthand true\
 	 --osm-files $< -o=$@
 
 
-input/$V/$N-$V-network.xml.gz:
-	$(sc) prepare network-from-sumo $(kyoto)/data/Kyoto_Network_C_2021/network_C.net.xml\
+input/$V/$N-$V-network.xml.gz: input/sumo.net.xml
+	$(sc) prepare network-from-sumo $<\
 	  --target-crs $(CRS) --output $@
-
 
 input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
 	# FIXME: Adjust GTFS
@@ -90,23 +89,20 @@ input/$V/$N-$V-facilities.xml.gz: input/$V/$N-$V-network.xml.gz input/facilities
 	 --output $@
 
 # Static population only contains the home locations
-input/$V/$N-static-$V-10pct.plans.xml.gz: $(kyoto)/data/census_kansai_region.csv $(kyoto)/data/kansai-region-epsg4612.gpkg input/facilities.gpkg
-	$(sc) prepare kyoto-population\
-		--input $<\
-		--shp $(word 2,$^) --shp-crs $(CRS)\
-		--facilities $(word 3,$^) --facilities-attr resident\
+input/$V/$N-static-$V-10pct.plans.xml.gz: input/facilities.gpkg
+	$(sc) prepare kansai-population\
+		--input $(kyoto)/data/census_kansai_region.csv\
+		--shp $(kyoto)/data/kansai-region-epsg4612.gpkg --shp-crs $(CRS)\
+		--facilities $< --facilities-attr resident\
 		--output $@
 
 
 # Assigns daily activity chains (without locations)
-$p/$N-activities-$V-10pct.plans.xml.gz: input/$V/$N-static-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
-	$(sc) prepare activity-sampling --seed 1 --input $< --output $@ --persons src/main/python/table-persons.csv --activities src/main/python/table-activities.csv
-
-	$(sc) prepare assign-reference-population --population $@ --output $@\
+input/$V/$N-$V-10pct.plans-initial.xml.gz: input/$V/$N-static-$V-10pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+	$(sc) prepare create-daily-plans --input $< --output $@\
 	 --persons src/main/python/table-persons.csv\
   	 --activities src/main/python/table-activities.csv\
-  	 --shp $(germany)/../matsim-berlin/data/SrV/zones/zones.shp\
-  	 --shp-crs $(CRS)\
+	 --shp $(kyoto)/data/kansai-region-epsg4612.gpkg --shp-crs $(CRS)\
 	 --facilities $(word 2,$^)\
 	 --network $(word 3,$^)\
 
@@ -127,7 +123,6 @@ $p/berlin-initial-$V-10pct.plans.xml.gz: $p/$N-activities-$V-25pct.plans.xml.gz 
 		 --samples 0.1 0.03 0.01\
 
 
-# Aggregated target
-# TODO:
-#prepare: input/$V/$N-$V-25pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
-#	echo "Done"
+# Aggregated target for input plans to calibration
+prepare: input/$V/$N-$V-10pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+	echo "Done"

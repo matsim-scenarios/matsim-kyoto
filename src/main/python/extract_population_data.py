@@ -63,9 +63,9 @@ if __name__ == "__main__":
     df = join_person_with_household(persons, hh)
     df = remove_persons_with_invalid_trips(df, trips)
 
-    df.to_csv(args.output + "-persons.csv")
+    df.to_csv(args.output + "-persons.csv", index=False)
 
     print("Written survey csvs with %d persons" % len(df))
 
-    activities = create_activities(df, trips, include_person_context=False, cut_groups=False)
+    activities = create_activities(df, trips, include_person_context=False, use_index_as_pid=False, cut_groups=False)
     activities.to_csv(args.output + "-activities.csv", index=False)

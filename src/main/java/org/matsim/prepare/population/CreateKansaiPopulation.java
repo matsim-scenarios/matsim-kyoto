@@ -31,10 +31,10 @@ import java.text.ParseException;
 import java.util.*;
 
 @CommandLine.Command(
-	name = "kyoto-population",
-	description = "Create synthetic population for kyoto."
+	name = "kansai-population",
+	description = "Create synthetic population for kansai region."
 )
-public class CreateKyotoPopulation implements MATSimAppCommand {
+public class CreateKansaiPopulation implements MATSimAppCommand {
 
 	private static final NumberFormat FMT = NumberFormat.getInstance(Locale.GERMAN);
 
@@ -61,7 +61,7 @@ public class CreateKyotoPopulation implements MATSimAppCommand {
 	private Population population;
 
 	public static void main(String[] args) {
-		new CreateKyotoPopulation().execute(args);
+		new CreateKansaiPopulation().execute(args);
 	}
 
 	private static int parseInt(String s) {
