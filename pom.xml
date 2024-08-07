@@ -67,7 +67,8 @@
 		<dependency>
 			<groupId>com.github.matsim-scenarios</groupId>
 			<artifactId>matsim-berlin</artifactId>
-			<version>ce81ea226c</version>
+			<version>6.3-SNAPSHOT</version>
+<!--			<version>d9f763ffbc</version>-->
 		</dependency>
 
 
@@ -102,6 +103,13 @@
 
 	<build>
 		<plugins>
+
+			<plugin>
+				<artifactId>maven-enforcer-plugin</artifactId>
+				<configuration>
+					<skip>true</skip>
+				</configuration>
+			</plugin>
 
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>

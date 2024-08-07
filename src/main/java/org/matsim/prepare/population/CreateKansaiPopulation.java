@@ -20,13 +20,11 @@ import org.matsim.core.population.PersonUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.scenario.ProjectionUtils;
 import org.matsim.core.utils.geometry.CoordinateTransformation;
-import org.matsim.core.utils.geometry.transformations.GeotoolsTransformation;
-import org.matsim.run.OpenBerlinScenario;
+import org.matsim.run.OpenKyotoScenario;
 import picocli.CommandLine;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.text.NumberFormat;
 import java.text.ParseException;
 import java.util.*;
 
@@ -36,10 +34,7 @@ import java.util.*;
 )
 public class CreateKansaiPopulation implements MATSimAppCommand {
 
-	private static final NumberFormat FMT = NumberFormat.getInstance(Locale.GERMAN);
-
 	private static final Logger log = LogManager.getLogger(CreateBerlinPopulation.class);
-	private final CoordinateTransformation ct = new GeotoolsTransformation("EPSG:32653", "EPSG:32653");
 
 	@CommandLine.Option(names = "--input", description = "Path to input csv data", required = true)
 	private Path input;
@@ -50,6 +45,9 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 	@CommandLine.Mixin
 	private ShpOptions shp = new ShpOptions();
 
+	@CommandLine.Option(names = "--postal-shp", description = "Path to postal code shape file", required = true)
+	private String postalShp;
+
 	@CommandLine.Option(names = "--output", description = "Path to output population", required = true)
 	private Path output;
 
@@ -59,6 +57,9 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 	private Map<String, MultiPolygon> zones;
 	private SplittableRandom rnd;
 	private Population population;
+	private ShpOptions.Index postalIndex;
+	private CoordinateTransformation ct;
+
 
 	public static void main(String[] args) {
 		new CreateKansaiPopulation().execute(args);
@@ -77,7 +78,7 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 	public Integer call() throws Exception {
 
 		if (!shp.isDefined()) {
-			log.error("Shape file with LOR zones is required.");
+			log.error("Shape file with zones is required.");
 			return 2;
 		}
 
@@ -86,6 +87,7 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		rnd = new SplittableRandom(0);
 		zones = new HashMap<>();
 		population = PopulationUtils.createPopulation(ConfigUtils.createConfig());
+		ct = shp.createInverseTransformation(OpenKyotoScenario.CRS);
 
 		// Collect all LORs
 		for (SimpleFeature ft : fts) {
@@ -93,6 +95,8 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		}
 
 		log.info("Found {} zones", zones.size());
+
+		postalIndex = new ShpOptions(postalShp, null, null).createIndex(OpenKyotoScenario.CRS, "_");
 
 		CSVFormat.Builder format = CSVFormat.DEFAULT.builder().setDelimiter(',').setHeader().setSkipHeaderRecord(true);
 
@@ -102,7 +106,7 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 				try {
 					processZone(row);
 				} catch (RuntimeException e) {
-					log.error("Error processing lor", e);
+					log.error("Error processing zone", e);
 					log.error(row.toString());
 				}
 			}
@@ -112,7 +116,7 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 
 		PopulationUtils.sortPersons(population);
 
-		ProjectionUtils.putCRS(population, OpenBerlinScenario.CRS);
+		ProjectionUtils.putCRS(population, OpenKyotoScenario.CRS);
 		PopulationUtils.writePopulation(population, output.toString());
 
 		return 0;
@@ -173,17 +177,21 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		double men = parseDouble(row.get("male"));
 		double womenQuota = women / (men + women);
 
-		double unemployed = parseDouble(row.get("unemployed")) / (parseDouble(row.get("total_em")));
 
-		EnumeratedAttributeDistribution<String> sex = new EnumeratedAttributeDistribution<>(Map.of("f", womenQuota, "m", 1 - womenQuota));
-		EnumeratedAttributeDistribution<Boolean> employment = new EnumeratedAttributeDistribution<>(Map.of(true, 1 - unemployed, false, unemployed));
+		// Employment is not used, because it can not be used from survey data
+		//		double unemployed = parseDouble(row.get("unemployed")) / (parseDouble(row.get("total_em")));
+//		EnumeratedAttributeDistribution<Boolean> employment = new EnumeratedAttributeDistribution<>(Map.of(true, 1 - unemployed, false, unemployed));
+
 		EnumeratedAttributeDistribution<AgeGroup> ageGroup = buildAgeDist(row);
+		EnumeratedAttributeDistribution<String> sex = new EnumeratedAttributeDistribution<>(Map.of("f", womenQuota, "m", 1 - womenQuota));
 
 		MultiPolygon geom = zones.get(zone);
 
 		PopulationFactory f = population.getFactory();
 
 		double inhabitants = n * sample;
+
+		int tries = 0;
 
 		while (inhabitants > 0) {
 
@@ -194,7 +202,7 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 			} else
 				inhabitants--;
 
-			Person person = f.createPerson(CreateBerlinPopulation.generateId(population, "", rnd));
+			Person person = f.createPerson(CreateBerlinPopulation.generateId(population, "p", rnd));
 			PersonUtils.setSex(person, sex.sample());
 			PopulationUtils.putSubpopulation(person, "person");
 
@@ -202,17 +210,27 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 
 			int age = group.max == Integer.MAX_VALUE ? 100 : rnd.nextInt(group.min, group.max + 1);
 
-
 			PersonUtils.setAge(person, age);
-			if (age >= 15)
-				PersonUtils.setEmployed(person, employment.sample());
 
-			Coord coord = ct.transform(CreateBerlinPopulation.sampleHomeCoordinate(geom, "EPSG:32653", facilities, rnd));
+			Coord coord = ct.transform(CreateBerlinPopulation.sampleHomeCoordinate(geom, OpenKyotoScenario.CRS, facilities, rnd, 100));
 
 			person.getAttributes().putAttribute(Attributes.HOME_X, coord.getX());
 			person.getAttributes().putAttribute(Attributes.HOME_Y, coord.getY());
 
 			person.getAttributes().putAttribute("city", parseInt(row.get("city code")));
+
+			SimpleFeature ft = postalIndex.queryFeature(coord);
+
+			// Skip and generate another person if no postal code is found
+			if (ft == null && tries++ < 10) {
+				inhabitants++;
+				continue;
+			} else {
+				String postal = ft == null ? "NA" : Objects.toString(ft.getAttribute("zip_pre")) + ft.getAttribute("zip_mid");
+				person.getAttributes().putAttribute("postal", postal);
+			}
+			tries = 0;
+
 
 			Plan plan = f.createPlan();
 			plan.addActivity(f.createActivityFromCoord("home", coord));

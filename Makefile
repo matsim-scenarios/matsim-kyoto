@@ -92,8 +92,9 @@ input/$V/$N-$V-facilities.xml.gz: input/$V/$N-$V-network.xml.gz input/facilities
 input/$V/$N-static-$V-10pct.plans.xml.gz: input/facilities.gpkg
 	$(sc) prepare kansai-population\
 		--input $(kyoto)/data/census_kansai_region.csv\
-		--shp $(kyoto)/data/kansai-region-epsg4612.gpkg --shp-crs $(CRS)\
-		--facilities $< --facilities-attr resident\
+		--shp $(kyoto)/data/kansai-region.gpkg\
+		--postal-shp $(kyoto)/data/postalcodes.gpkg\
+		--facilities $< --facilities-attr all\
 		--output $@
 
 
@@ -102,25 +103,9 @@ input/$V/$N-$V-10pct.plans-initial.xml.gz: input/$V/$N-static-$V-10pct.plans.xml
 	$(sc) prepare create-daily-plans --input $< --output $@\
 	 --persons src/main/python/table-persons.csv\
   	 --activities src/main/python/table-activities.csv\
-	 --shp $(kyoto)/data/kansai-region-epsg4612.gpkg --shp-crs $(CRS)\
+	 --shp $(kyoto)/data/postalcodes.gpkg\
 	 --facilities $(word 2,$^)\
 	 --network $(word 3,$^)\
-
-
-# Assigns locations to the activities
-$p/berlin-initial-$V-10pct.plans.xml.gz: $p/$N-activities-$V-25pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
-	$(sc) prepare init-location-choice\
-	 --input $<\
-	 --output $@\
-	 --facilities $(word 2,$^)\
-	 --network $(word 3,$^)\
-	 --shp $(germany)/vg5000/vg5000_ebenen_0101/VG5000_GEM.shp\
-	 --commuter $(germany)/regionalstatistik/commuter.csv\
-
-	# For debugging and visualization
-	$(sc) prepare downsample-population $@\
-		 --sample-size 0.25\
-		 --samples 0.1 0.03 0.01\
 
 
 # Aggregated target for input plans to calibration
