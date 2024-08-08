@@ -1,28 +1,48 @@
 package org.matsim.prepare.population;
 
+import it.unimi.dsi.fastutil.doubles.DoubleList;
 import me.tongfei.progressbar.ProgressBar;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.geotools.api.feature.simple.SimpleFeature;
+import org.locationtech.jts.geom.Geometry;
+import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.index.strtree.STRtree;
 import org.matsim.api.core.v01.Coord;
-import org.matsim.api.core.v01.population.Person;
-import org.matsim.api.core.v01.population.Population;
+import org.matsim.api.core.v01.network.Link;
+import org.matsim.api.core.v01.network.Network;
+import org.matsim.api.core.v01.population.*;
 import org.matsim.application.MATSimAppCommand;
+import org.matsim.application.analysis.population.TripAnalysis;
 import org.matsim.application.options.ShpOptions;
+import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.population.PersonUtils;
 import org.matsim.core.population.PopulationUtils;
 import org.matsim.core.population.algorithms.ParallelPersonAlgorithmUtils;
 import org.matsim.core.population.algorithms.PersonAlgorithm;
+import org.matsim.core.router.TripStructureUtils;
+import org.matsim.core.utils.geometry.CoordUtils;
+import org.matsim.core.utils.geometry.geotools.MGC;
+import org.matsim.facilities.ActivityFacility;
+import org.matsim.prepare.facilities.AttributedActivityFacility;
+import org.matsim.run.OpenKyotoScenario;
 import picocli.CommandLine;
 
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Path;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
+
+import static org.matsim.prepare.facilities.CreateMATSimFacilities.IGNORED_LINK_TYPES;
+
 
 @CommandLine.Command(
 	name = "create-daily-plans",
@@ -41,16 +61,24 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 	private Path personsPath;
 	@CommandLine.Option(names = "--activities", description = "Path to activity table", required = true)
 	private Path activityPath;
-	@CommandLine.Option(names = "--facilities", description = "Path to facilities file", required = true)
+	@CommandLine.Option(names = "--facilities", description = "Path to MATSim facilities", required = true)
 	private Path facilityPath;
 	@CommandLine.Option(names = "--network", description = "Path to network file", required = true)
 	private Path networkPath;
 	@CommandLine.Option(names = "--seed", description = "Seed used to sample locations", defaultValue = "1")
 	private long seed;
+
 	@CommandLine.Mixin
 	private ShpOptions shp;
+
 	private Population population;
+	private FacilityIndex facilities;
+	private Network network;
 	private Map<String, List<CSVRecord>> activities;
+	private Map<String, Geometry> zones;
+	private PlanBuilder planBuilder;
+	private AtomicInteger counter = new AtomicInteger();
+
 	private ProgressBar pb;
 
 	public static void main(String[] args) {
@@ -73,9 +101,11 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 			return 2;
 		}
 
-		// TODO: map zones to shape file
-
+		zones = readZones(shp);
 		activities = RunActivitySampling.readActivities(activityPath);
+
+		facilities = new FacilityIndex(facilityPath.toString(), OpenKyotoScenario.CRS);
+		planBuilder = new PlanBuilder(createZoneSelector());
 
 		// Remove activities with missing leg duration
 		activities.values().removeIf(
@@ -89,6 +119,7 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 			readPersons(csv);
 		}
 
+		network = NetworkUtils.readNetwork(networkPath.toString());
 		population = PopulationUtils.readPopulation(input.toString());
 
 		pb = new ProgressBar("Creating daily plans", population.getPersons().size());
@@ -97,7 +128,38 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 
 		PopulationUtils.writePopulation(population, output.toString());
 
+		log.info("Matched {} out of {} persons. Remaining were sampled.", counter.get(), population.getPersons().size());
+
 		return 0;
+	}
+
+	/**
+	 * Build map of zones to facilities.
+	 */
+	private Function<CSVRecord, Set<ActivityFacility>> createZoneSelector() {
+
+		STRtree index = new STRtree();
+		for (Map.Entry<String, Geometry> e : zones.entrySet()) {
+			index.insert(e.getValue().getEnvelopeInternal(), e);
+		}
+		index.build();
+
+		// Contains all activities for a zone
+		Map<String, Set<ActivityFacility>> zoneFacilities = new HashMap<>();
+		for (ActivityFacility facility : facilities.all.getFacilities().values()) {
+			Point point = MGC.coord2Point(facility.getCoord());
+			List<Map.Entry<String, Geometry>> matches = index.query(point.getEnvelopeInternal());
+			for (Map.Entry<String, Geometry> match : matches) {
+				if (match.getValue().contains(point)) {
+					zoneFacilities.computeIfAbsent(match.getKey(), k -> new HashSet<>()).add(facility);
+				}
+			}
+		}
+
+		return row -> {
+			String zone = getZone(row.get("location"), row.get("zone"));
+			return zoneFacilities.getOrDefault(zone, Collections.emptySet());
+		};
 	}
 
 	@Override
@@ -107,11 +169,14 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 
 		Coord homeCoord = Attributes.getHomeCoord(person);
 
+		Zone matched = Zone.FULL;
 		String personId = matchPerson(rnd, createKey(person, Zone.FULL));
 		if (personId == null) {
+			matched = Zone.CITY;
 			personId = matchPerson(rnd, createKey(person, Zone.CITY));
 		}
 		if (personId == null) {
+			matched = Zone.NONE;
 			personId = matchPerson(rnd, createKey(person, Zone.NONE));
 		}
 
@@ -120,15 +185,187 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 			return;
 		}
 
+		CSVRecord row = persons.get(personId);
 		List<CSVRecord> activities = Objects.requireNonNull(this.activities.get(personId), "No activities found");
 
-		RunActivitySampling.createPlan(homeCoord, activities, rnd, population.getFactory());
+		String mobile = row.get("mobile_on_day");
 
-		// TODO: select locations
+		// Nothing to do for persons without activities
+		if (mobile.equalsIgnoreCase("false")) {
+			counter.incrementAndGet();
+			pb.step();
+			return;
+		}
 
-		// TODO: add reference modes and weights for fully matched persons
+		Plan plan = RunActivitySampling.createPlan(homeCoord, activities, rnd, population.getFactory());
+
+		boolean fullMatch = false;
+
+		// Persons with high matching quality are added as reference persons
+		// These can be used for mode choice calibration or analysis
+		if (matched != Zone.NONE) {
+
+			fullMatch = planBuilder.assignLocationsFromZones(activities, plan, homeCoord, false, rnd);
+
+			// Match again, this time ignoring facility types
+			// Facility information is too sparse in certain areas
+			if (!fullMatch) {
+				planBuilder.assignLocationsFromZones(activities, plan, homeCoord, true, rnd);
+			}
+
+			if (fullMatch) {
+				String refModes = TripStructureUtils.getLegs(plan).stream().map(Leg::getMode).collect(Collectors.joining("-"));
+				person.getAttributes().putAttribute(TripAnalysis.ATTR_REF_MODES, refModes);
+				person.getAttributes().putAttribute(TripAnalysis.ATTR_REF_ID, personId);
+				counter.incrementAndGet();
+			}
+		}
+
+		// Sample suitable locations but only by distance
+		if (!fullMatch) {
+			sampleLocationsByDist(person, plan, rnd);
+		}
+
+		person.removePlan(person.getSelectedPlan());
+		person.addPlan(plan);
+		person.setSelectedPlan(plan);
 
 		pb.step();
+	}
+
+	/**
+	 * Select suitable locations with matching distances.
+	 */
+	private void sampleLocationsByDist(Person person, Plan plan, SplittableRandom rnd) {
+
+		Coord homeCoord = Attributes.getHomeCoord(person);
+
+		List<Activity> acts = TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
+
+		// Activities that only occur on one place per person
+		Map<String, ActivityFacility> fixedLocations = new HashMap<>();
+
+		// keep track of the current coordinate
+		Coord lastCoord = homeCoord;
+
+		for (Activity act : acts) {
+
+			if (Attributes.isLinkUnassigned(act.getLinkId())) {
+
+				String type = act.getType();
+
+				act.setLinkId(null);
+				ActivityFacility location = null;
+
+				// target leg distance in meter
+				double dist = (double) act.getAttributes().getAttribute("orig_dist") * 1000;
+
+				if (fixedLocations.containsKey(type)) {
+					location = fixedLocations.get(type);
+				}
+
+				// TODO: some commuting information should be integrated as well because some zones should be more likely to be selected
+
+				if (location == null) {
+					// Needed for lambda
+					final Coord refCoord = lastCoord;
+
+					// Unknown activity will use any work location
+					STRtree index = facilities.index.containsKey(type) ? facilities.index.get(type) : facilities.index.get("work");
+
+					// Distance should be within the bounds
+					for (Double b : DoubleList.of(1, 1.2, 1.5)) {
+						List<AttributedActivityFacility> query = index.query(MGC.coord2Point(lastCoord).buffer(dist * (b + 0.5) + 250).getEnvelopeInternal());
+						List<AttributedActivityFacility> res = query.stream().filter(f -> checkDistanceBound(dist, refCoord, f.getCoord(), b)).toList();
+
+						if (!res.isEmpty()) {
+							location = res.get(rnd.nextInt(res.size()));
+							break;
+						}
+					}
+				}
+
+				if (location == null) {
+					// sample only coordinate if nothing else is possible
+					Coord c = sampleLink(rnd, dist, lastCoord);
+					act.setCoord(c);
+					lastCoord = c;
+					continue;
+				}
+
+				if (type.equals("work") || type.startsWith("edu"))
+					fixedLocations.put(type, location);
+
+				act.setFacilityId(location.getId());
+			}
+
+			if (act.getCoord() != null)
+				lastCoord = act.getCoord();
+			else if (act.getFacilityId() != null)
+				lastCoord = facilities.all.getFacilities().get(act.getFacilityId()).getCoord();
+
+		}
+
+	}
+
+	/**
+	 * Sample a coordinate for which the associated link is not one of the ignored types.
+	 */
+	private Coord sampleLink(SplittableRandom rnd, double dist, Coord origin) {
+
+		Coord coord = null;
+		for (int i = 0; i < 500; i++) {
+			coord = InitLocationChoice.rndCoord(rnd, dist, origin);
+			Link link = NetworkUtils.getNearestLink(network, coord);
+			if (!IGNORED_LINK_TYPES.contains(NetworkUtils.getType(link)))
+				break;
+		}
+
+		return coord;
+	}
+
+	/**
+	 * General logic to filter coordinate within target distance.
+	 */
+	private boolean checkDistanceBound(double target, Coord refCoord, Coord other, double factor) {
+		double lower = target * 0.8 * (2 - factor) - 250;
+		double upper = target * 1.15 * factor + 250;
+
+		double dist = CoordUtils.calcEuclideanDistance(refCoord, other);
+		return dist >= lower && dist <= upper;
+	}
+
+	/**
+	 * Read zones ussd in the survey.
+	 */
+	private Map<String, Geometry> readZones(ShpOptions shp) {
+
+		Map<String, Geometry> result = new HashMap<>();
+
+		// Collect all zones of a city
+		Map<String, List<Geometry>> cities = new HashMap<>();
+
+		for (SimpleFeature feature : shp.readFeatures()) {
+
+			String city = (String) feature.getAttribute("jichi_code");
+			String zone = (String) feature.getAttribute("zip_pre") + feature.getAttribute("zip_mid");
+
+			result.put(city + "_" + zone, (Geometry) feature.getDefaultGeometry());
+			cities.computeIfAbsent(city, (k) -> new ArrayList<>()).add((Geometry) feature.getDefaultGeometry());
+		}
+
+		// Add city level zones
+		cities.forEach((city, geoms) -> {
+			Geometry cityGeom = geoms.get(0);
+			for (int i = 1; i < geoms.size(); i++) {
+				cityGeom = cityGeom.union(geoms.get(i));
+			}
+			result.put(city, cityGeom);
+		});
+
+		log.info("Read {} zones", result.size());
+
+		return result;
 	}
 
 	/**
@@ -186,14 +423,17 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 		return subgroup.get(rnd.nextInt(subgroup.size()));
 	}
 
-	private Stream<Key> createKey(String gender, int age, String location, String zone) {
-
-		String homeZone;
+	private static String getZone(String location, String zone) {
 		if (zone.isBlank() || zone.equals(location))
-			homeZone = location;
+			return location;
 		else
 			// The last two digits of the postal code are not known
-			homeZone = location + "_" + zone.substring(0, zone.length() - 2);
+			return location + "_" + zone.substring(0, zone.length() - 2);
+	}
+
+	private Stream<Key> createKey(String gender, int age, String location, String zone) {
+
+		String homeZone = getZone(location, zone);
 
 		if (age <= 10) {
 			return IntStream.rangeClosed(0, 10).mapToObj(i -> new Key(null, i, homeZone));
