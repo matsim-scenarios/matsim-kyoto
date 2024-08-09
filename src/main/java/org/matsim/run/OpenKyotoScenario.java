@@ -34,7 +34,7 @@ public class OpenKyotoScenario extends MATSimApplication {
 	private final SampleOptions sample = new SampleOptions(10, 25, 3, 1);
 
 	public OpenKyotoScenario() {
-		super(String.format("input/v%s/kyoto-v%s.config.xml", VERSION, VERSION));
+		super(String.format("input/v%s/kyoto-v%s-10pct.config.xml", VERSION, VERSION));
 	}
 
 	public static void main(String[] args) {
