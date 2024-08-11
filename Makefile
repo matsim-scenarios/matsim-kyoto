@@ -106,6 +106,7 @@ input/$V/$N-activities-$V-10pct.plans.xml.gz: input/$V/$N-static-$V-10pct.plans.
 	$(sc) prepare create-daily-plans --input $< --output $@\
 	 --persons src/main/python/table-persons.csv\
   	 --activities src/main/python/table-activities.csv\
+  	 --commuter src/main/python/work-commuter.csv\
 	 --shp $(kyoto)/data/postalcodes.gpkg\
 	 --facilities $(word 2,$^)\
 	 --network $(word 3,$^)\

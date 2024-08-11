@@ -26,6 +26,7 @@
     "college": ["edu_higher", "work"],
     "sports_hall": ["leisure", "work"],
     "stadium": ["leisure", "work"],
+    "garage": ["parking"],
     "apartments": ["resident"],
     "yes": ["resident"],
     "house": ["resident"],
@@ -78,7 +79,8 @@
     "post_depot": ["p_business", "work"],
     "post_office": ["p_business", "work"],
     "prison": ["p_business", "work"],
-    "townhall": ["p_business", "work"]
+    "townhall": ["p_business", "work"],
+    "parking": ["parking"]
   },
   "landuse": {
     "commercial": ["shop", "work", "delivery"],

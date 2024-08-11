@@ -1,6 +1,9 @@
 package org.matsim.prepare.population;
 
+import it.unimi.dsi.fastutil.Pair;
 import it.unimi.dsi.fastutil.doubles.DoubleList;
+import it.unimi.dsi.fastutil.objects.Object2DoubleMap;
+import it.unimi.dsi.fastutil.objects.Object2DoubleOpenHashMap;
 import me.tongfei.progressbar.ProgressBar;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -37,6 +40,7 @@ import java.nio.file.Path;
 import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 import java.util.stream.Stream;
@@ -53,6 +57,7 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 	private static final Logger log = LogManager.getLogger(CreateDailyPlans.class);
 	private final Map<String, CSVRecord> persons = new HashMap<>();
 	private final Map<Key, List<String>> groups = new HashMap<>();
+	private final AtomicInteger counter = new AtomicInteger();
 	@CommandLine.Option(names = "--input", description = "Path to input population.")
 	private Path input;
 	@CommandLine.Option(names = "--output", description = "Path to output population", required = true)
@@ -65,9 +70,10 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 	private Path facilityPath;
 	@CommandLine.Option(names = "--network", description = "Path to network file", required = true)
 	private Path networkPath;
+	@CommandLine.Option(names = "--commuter", description = "Path to commuter csv file", required = true)
+	private Path commuterPath;
 	@CommandLine.Option(names = "--seed", description = "Seed used to sample locations", defaultValue = "1")
 	private long seed;
-
 	@CommandLine.Mixin
 	private ShpOptions shp;
 
@@ -76,13 +82,20 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 	private Network network;
 	private Map<String, List<CSVRecord>> activities;
 	private Map<String, Geometry> zones;
+	private Object2DoubleMap<Pair<String, String>> commuter;
 	private PlanBuilder planBuilder;
-	private AtomicInteger counter = new AtomicInteger();
-
 	private ProgressBar pb;
 
 	public static void main(String[] args) {
 		new CreateDailyPlans().execute(args);
+	}
+
+	private static String getZone(String location, String zone) {
+		if (zone.isBlank() || zone.equals(location))
+			return location;
+		else
+			// The last two digits of the postal code are not known
+			return location + "_" + zone.substring(0, zone.length() - 2);
 	}
 
 	/**
@@ -104,7 +117,7 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 		zones = readZones(shp);
 		activities = RunActivitySampling.readActivities(activityPath);
 
-		facilities = new FacilityIndex(facilityPath.toString(), OpenKyotoScenario.CRS);
+		facilities = new FacilityIndex(facilityPath.toString(), createFacilityFilter(), OpenKyotoScenario.CRS);
 		planBuilder = new PlanBuilder(createZoneSelector());
 
 		// Remove activities with missing leg duration
@@ -119,6 +132,14 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 			readPersons(csv);
 		}
 
+		commuter = new Object2DoubleOpenHashMap<>();
+		try (CSVParser csv = CSVParser.parse(commuterPath, StandardCharsets.UTF_8,
+			CSVFormat.DEFAULT.builder().setHeader().setSkipHeaderRecord(true).build())) {
+			for (CSVRecord r : csv) {
+				commuter.put(Pair.of(r.get("home"), r.get("work")), Double.parseDouble(r.get("n")));
+			}
+		}
+
 		network = NetworkUtils.readNetwork(networkPath.toString());
 		population = PopulationUtils.readPopulation(input.toString());
 
@@ -131,6 +152,33 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 		log.info("Matched {} out of {} persons. Remaining were sampled.", counter.get(), population.getPersons().size());
 
 		return 0;
+	}
+
+	/**
+	 * Assigns zones to facilities.
+	 */
+	private Predicate<ActivityFacility> createFacilityFilter() {
+
+		STRtree index = new STRtree();
+		for (Map.Entry<String, Geometry> e : zones.entrySet()) {
+			if (e.getKey().contains("_"))
+				continue;
+
+			index.insert(e.getValue().getEnvelopeInternal(), e);
+		}
+		index.build();
+
+		return facility -> {
+			Point point = MGC.coord2Point(facility.getCoord());
+			List<Map.Entry<String, Geometry>> matches = index.query(point.getEnvelopeInternal());
+			for (Map.Entry<String, Geometry> match : matches) {
+				if (match.getValue().contains(point)) {
+					facility.getAttributes().putAttribute("location", match.getKey());
+				}
+			}
+
+			return true;
+		};
 	}
 
 	/**
@@ -152,6 +200,7 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 			for (Map.Entry<String, Geometry> match : matches) {
 				if (match.getValue().contains(point)) {
 					zoneFacilities.computeIfAbsent(match.getKey(), k -> new HashSet<>()).add(facility);
+					break;
 				}
 			}
 		}
@@ -239,6 +288,7 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 	private void sampleLocationsByDist(Person person, Plan plan, SplittableRandom rnd) {
 
 		Coord homeCoord = Attributes.getHomeCoord(person);
+		String homeZone = Objects.toString(person.getAttributes().getAttribute("city"));
 
 		List<Activity> acts = TripStructureUtils.getActivities(plan, TripStructureUtils.StageActivityHandling.ExcludeStageActivities);
 
@@ -264,8 +314,6 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 					location = fixedLocations.get(type);
 				}
 
-				// TODO: some commuting information should be integrated as well because some zones should be more likely to be selected
-
 				if (location == null) {
 					// Needed for lambda
 					final Coord refCoord = lastCoord;
@@ -279,7 +327,17 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 						List<AttributedActivityFacility> res = query.stream().filter(f -> checkDistanceBound(dist, refCoord, f.getCoord(), b)).toList();
 
 						if (!res.isEmpty()) {
-							location = res.get(rnd.nextInt(res.size()));
+							if (type.equals("work")) {
+
+								// Sample a location using the commuting as weight
+								location = FacilityIndex.sampleWithGrouping(res,
+									f -> Objects.requireNonNullElse(f.getLocation(), "na"),
+									// Use a minimum weight of 1 so that all locations have a chance to be chosen
+									e -> Math.max(1, commuter.getDouble(Pair.of(homeZone, e.getKey()))),
+									rnd);
+							} else
+								location = res.get(rnd.nextInt(res.size()));
+
 							break;
 						}
 					}
@@ -421,14 +479,6 @@ public class CreateDailyPlans implements MATSimAppCommand, PersonAlgorithm {
 		// weights can be preprocessed after reading in
 
 		return subgroup.get(rnd.nextInt(subgroup.size()));
-	}
-
-	private static String getZone(String location, String zone) {
-		if (zone.isBlank() || zone.equals(location))
-			return location;
-		else
-			// The last two digits of the postal code are not known
-			return location + "_" + zone.substring(0, zone.length() - 2);
 	}
 
 	private Stream<Key> createKey(String gender, int age, String location, String zone) {

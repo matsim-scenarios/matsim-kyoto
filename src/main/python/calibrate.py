@@ -1,83 +1,58 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import os
-import pandas as pd
 import geopandas as gpd
 
-from matsim.calibration import create_calibration, ASCCalibrator, utils, analysis
+from matsim.calibration import create_calibration, ASCCalibrator, utils
 
-#%%
+# %%
 
-if os.path.exists("mid.csv"):
-    srv = pd.read_csv("mid.csv")
-    sim = pd.read_csv("sim.csv")
-
-    _, adj = analysis.calc_adjusted_mode_share(sim, srv)
-
-    print(srv.groupby("mode").sum())
-
-    print("Adjusted")
-    print(adj.groupby("mode").sum())
-
-    adj.to_csv("mid_adj.csv", index=False)
-
-#%%
-
-modes = ["walk", "car", "ride", "pt", "bike"]
+modes = ["walk", "car", "pt", "bike", "ride"]
 fixed_mode = "walk"
 initial = {
-    "bike": -0.141210,
-    "pt": 0.0781477780346438,
-    "car": 0.871977390743304,
-    "ride": -2.22873502992
+    "bike": -1.4,
+    "pt": 0.6,
+    "car": -1,
+    "ride": -1.4
 }
 
-# FIXME: Adjust
+# Modal split according to survey of milt
+# The modal split is only calibrated for persons living in kyoto
 target = {
-    "walk": 0.1,
-    "bike": 0.1,
-    "pt": 0.1,
-    "car": 0.1,
-    "ride": 0.1
+    "walk": 0.239023,
+    "bike": 0.232813,
+    "pt": 0.236254,
+    "car": 0.217186,
+    "ride": 0.074724
 }
 
-region = gpd.read_file("../scenarios/dilutionArea.shp").set_crs("EPSG:25832")
-homes = pd.read_csv("template-v1.0-homes.csv", dtype={"person": "str"})
+region = gpd.read_file("../input/area.gpkg")
 
 
 def filter_persons(persons):
-    persons = pd.merge(persons, homes, how="inner", left_on="person", right_on="person")
     persons = gpd.GeoDataFrame(persons, geometry=gpd.points_from_xy(persons.home_x, persons.home_y))
-
-    df = gpd.sjoin(persons.set_crs("EPSG:25832"), city, how="inner", predicate="intersects")
+    df = gpd.sjoin(persons.set_crs("EPSG:32653"), region, how="inner", predicate="intersects")
 
     print("Filtered %s persons" % len(df))
-
     return df
 
 
 def filter_modes(df):
-    df = df[df.main_mode != "freight"]
-    df.loc[df.main_mode.str.startswith("pt_"), "main_mode"] = "pt"
+    return df[df.main_mode.isin(modes)]
 
-    return df
-
-
-# FIXME: Adjust paths and config
 
 study, obj = create_calibration(
     "calib",
     ASCCalibrator(modes, initial, target, lr=utils.linear_scheduler(start=0.3, interval=15)),
-    "matsim-template-1.0.jar",
-    "../input/v1.0/[name]-v1.0.config.xml",
+    "matsim-kyoto-1.0-SNAPSHOT.jar",
+    "../input/v1.0/kyoto-v1.0-10pct.config.xml",
     args="--10pct",
-    jvm_args="-Xmx55G -Xms55G -XX:+AlwaysPreTouch -XX:+UseParallelGC",
+    jvm_args="-Xmx48G -Xms48G -XX:+AlwaysPreTouch -XX:+UseParallelGC",
     transform_persons=filter_persons,
     transform_trips=filter_modes,
     chain_runs=utils.default_chain_scheduler, debug=False
 )
 
-#%%
+# %%
 
-study.optimize(obj, 10)
+study.optimize(obj, 6)
