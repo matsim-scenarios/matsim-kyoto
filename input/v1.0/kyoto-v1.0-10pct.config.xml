@@ -114,7 +114,7 @@
 		<param name="fractionOfIterationsToStartScoreMSA" value="0.9"/>
 		<parameterset type="scoringParameters">
 <!--TODO: These are default uncalibrated values	-->
-			<param name="marginalUtilityOfMoney" value="1.0"/>
+			<param name="marginalUtilityOfMoney" value="0.00625"/>
 			<param name="performing" value="6.0"/>
 
 <!--TODO: Costs structure is not yet updated	-->
