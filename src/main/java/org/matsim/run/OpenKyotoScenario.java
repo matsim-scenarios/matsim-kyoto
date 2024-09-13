@@ -86,13 +86,13 @@ public class OpenKyotoScenario extends MATSimApplication {
 				.setWeight(0.15)
 				.setSubpopulation("person")
 		);
-
-		config.replanning().addStrategySettings(
-			new ReplanningConfigGroup.StrategySettings()
-				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.SubtourModeChoice)
-				.setWeight(0.15)
-				.setSubpopulation("person")
-		);
+// TODO: modechoice is not calibrated yet
+//		config.replanning().addStrategySettings(
+//			new ReplanningConfigGroup.StrategySettings()
+//				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.SubtourModeChoice)
+//				.setWeight(0.15)
+//				.setSubpopulation("person")
+//		);
 
 		return config;
 	}
