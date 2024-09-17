@@ -30,7 +30,7 @@
 		<matsim.version>${project.parent.version}</matsim.version>
 
 		<!-- Some functionality is used from OpenBerlin -->
-		<berlin.veraion>b0d581d153</berlin.veraion>
+		<berlin.version>b0d581d153</berlin.version>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -71,7 +71,7 @@
 			<groupId>com.github.matsim-scenarios</groupId>
 			<artifactId>matsim-berlin</artifactId>
 <!--			<version>6.3-SNAPSHOT</version>-->
-			<version>${berlin.veraion}</version>
+			<version>${berlin.version}</version>
 		</dependency>
 
 
