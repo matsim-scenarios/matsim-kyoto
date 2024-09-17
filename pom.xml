@@ -9,7 +9,7 @@
 		<!-- <version>15.0</version> -->
 
 		<!-- PR-labelled release -->
-		<version>2025.0-PR3470</version>
+		<version>2025.0-PR3483</version>
 
 		<!-- snapshot == not recommended: rather use PR-labelled release!-->
 <!--		<version>2025.0-SNAPSHOT</version>-->
@@ -28,6 +28,9 @@
 
 		<!-- Don't modify, will use the same version as parent -->
 		<matsim.version>${project.parent.version}</matsim.version>
+
+		<!-- Some functionality is used from OpenBerlin -->
+		<berlin.veraion>b0d581d153</berlin.veraion>
 
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -68,7 +71,7 @@
 			<groupId>com.github.matsim-scenarios</groupId>
 			<artifactId>matsim-berlin</artifactId>
 <!--			<version>6.3-SNAPSHOT</version>-->
-			<version>93c414be68</version>
+			<version>${berlin.veraion}</version>
 		</dependency>
 
 
