@@ -97,6 +97,7 @@ input/$V/$N-static-$V-10pct.plans.xml.gz: input/facilities.gpkg
 		--input $(kyoto)/data/census_kansai_region.csv\
 		--shp $(kyoto)/data/kansai-region.gpkg\
 		--postal-shp $(kyoto)/data/postalcodes.gpkg\
+		--income $(confidential)/data/income_distribution.csv\
 		--facilities $< --facilities-attr all\
 		--output $@
 
