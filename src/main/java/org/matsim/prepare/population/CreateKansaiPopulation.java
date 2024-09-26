@@ -1,5 +1,11 @@
 package org.matsim.prepare.population;
 
+import it.unimi.dsi.fastutil.doubles.Double2DoubleLinkedOpenHashMap;
+import it.unimi.dsi.fastutil.doubles.Double2DoubleMap;
+import it.unimi.dsi.fastutil.doubles.DoubleArrayList;
+import it.unimi.dsi.fastutil.doubles.DoubleList;
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import me.tongfei.progressbar.ProgressBar;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVParser;
@@ -23,6 +29,7 @@ import org.matsim.core.utils.geometry.CoordinateTransformation;
 import org.matsim.run.OpenKyotoScenario;
 import picocli.CommandLine;
 
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.text.ParseException;
@@ -34,7 +41,11 @@ import java.util.*;
 )
 public class CreateKansaiPopulation implements MATSimAppCommand {
 
-	private static final Logger log = LogManager.getLogger(CreateBerlinPopulation.class);
+	// Define the tax brackets and corresponding rates
+	private static final double[] TAX_BRACKETS = {1_950_000, 3_300_000, 6_950_000, 9_000_000, 18_000_000, 40_000_000};
+	private static final double[] TAX_RATES = {0.05, 0.1, 0.2, 0.23, 0.33, 0.4, 0.45};
+
+	private static final Logger log = LogManager.getLogger(CreateKansaiPopulation.class);
 
 	@CommandLine.Option(names = "--input", description = "Path to input csv data", required = true)
 	private Path input;
@@ -48,6 +59,9 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 	@CommandLine.Option(names = "--postal-shp", description = "Path to postal code shape file", required = true)
 	private String postalShp;
 
+	@CommandLine.Option(names = "--income", description = "Path to income csv", required = true)
+	private String incomePath;
+
 	@CommandLine.Option(names = "--output", description = "Path to output population", required = true)
 	private Path output;
 
@@ -58,8 +72,12 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 	private SplittableRandom rnd;
 	private Population population;
 	private ShpOptions.Index postalIndex;
-	private CoordinateTransformation ct;
 
+	/**
+	 * Map of city code to income distribution.
+	 */
+	private Int2ObjectMap<EnumeratedAttributeDistribution<Double>> income;
+	private CoordinateTransformation ct;
 
 	public static void main(String[] args) {
 		new CreateKansaiPopulation().execute(args);
@@ -71,6 +89,28 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 
 	private static double parseDouble(String s) {
 		return s.equals("-") || s.isBlank() ? 0.0 : Double.parseDouble(s);
+	}
+
+	/**
+	 * Calculate income after tax, for one individual person. For household income this can not be applied.
+	 */
+	public static double calculateIncomeAfterTax(double income) {
+		double tax = 0.0;
+		double previousBracket = 0.0;
+
+		for (int i = 0; i < TAX_BRACKETS.length; i++) {
+			if (income > TAX_BRACKETS[i]) {
+				tax += (TAX_BRACKETS[i] - previousBracket) * TAX_RATES[i];
+				previousBracket = TAX_BRACKETS[i];
+			} else {
+				tax += (income - previousBracket) * TAX_RATES[i];
+				return income - tax;
+			}
+		}
+
+		// If income is above the highest bracket
+		tax += (income - previousBracket) * TAX_RATES[TAX_RATES.length - 1];
+		return income - tax;
 	}
 
 	@Override
@@ -97,6 +137,7 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		log.info("Found {} zones", zones.size());
 
 		postalIndex = new ShpOptions(postalShp, null, null).createIndex(OpenKyotoScenario.CRS, "_");
+		income = readIncomeDistribution(incomePath);
 
 		CSVFormat.Builder format = CSVFormat.DEFAULT.builder().setDelimiter(',').setHeader().setSkipHeaderRecord(true);
 
@@ -120,6 +161,49 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		PopulationUtils.writePopulation(population, output.toString());
 
 		return 0;
+	}
+
+	/**
+	 * Read income distribution from csv file.
+	 */
+	private Int2ObjectMap<EnumeratedAttributeDistribution<Double>> readIncomeDistribution(String incomePath) throws IOException {
+
+		Int2ObjectMap<EnumeratedAttributeDistribution<Double>> result = new Int2ObjectOpenHashMap<>();
+
+		CSVFormat.Builder format = CSVFormat.DEFAULT.builder().setDelimiter(',').setHeader().setSkipHeaderRecord(true);
+
+		try (CSVParser csv = format.build().parse(Files.newBufferedReader(Path.of(incomePath)))) {
+			for (CSVRecord row : csv) {
+
+				DoubleList incomes = new DoubleArrayList();
+
+				for (int i = 2; i < row.size(); i++) {
+					String value = row.get(i).replace(",", "");
+					incomes.add(value.equals("-") ? 0 : parseDouble(value));
+				}
+
+				double total = incomes.doubleStream().sum();
+
+				// probabilities
+				Double2DoubleMap p = new Double2DoubleLinkedOpenHashMap();
+
+				// Group data depends on groups in the input
+				for (int i = 0; i < incomes.size(); i++) {
+					double income = 250_000 + 500_000 * (i + 1);
+
+					// number of people in the group
+					double n = incomes.getDouble(i);
+
+					// yearly income is converted to monthly income
+					p.put(income / 12, n / total);
+				}
+
+				EnumeratedAttributeDistribution<Double> dist = new EnumeratedAttributeDistribution<>(p);
+				result.put(Integer.parseInt(row.get("city town code")), dist);
+			}
+		}
+
+		return result;
 	}
 
 	private EnumeratedAttributeDistribution<AgeGroup> buildAgeDist(CSVRecord row) {
@@ -217,7 +301,20 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 			person.getAttributes().putAttribute(Attributes.HOME_X, coord.getX());
 			person.getAttributes().putAttribute(Attributes.HOME_Y, coord.getY());
 
-			person.getAttributes().putAttribute("city", parseInt(row.get("city code")));
+			int cityCode = parseInt(row.get("city code"));
+			person.getAttributes().putAttribute("city", cityCode);
+
+			// Some city codes are only available as aggregated data
+			if (!income.containsKey(cityCode)) {
+				cityCode = (cityCode / 10) * 10;
+			}
+			if (!income.containsKey(cityCode)) {
+				cityCode = (cityCode / 100) * 100;
+			}
+
+			EnumeratedAttributeDistribution<Double> incomeDist = Objects.requireNonNull(income.get(cityCode));
+
+			PersonUtils.setIncome(person, incomeDist.sample());
 
 			SimpleFeature ft = postalIndex.queryFeature(coord);
 
