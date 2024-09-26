@@ -15,8 +15,8 @@ public final class KNRunOpenKyotoScenario{
 		args = new String [] {
 				"--config:network.inputNetworkFile=../../../../../shared-svn/projects/matsim-kyoto/data/input/kyoto-v1.0-network.xml.gz",
 				"--config:plans.inputPlansFile=../../../../../shared-svn/projects/matsim-kyoto/data/input/kyoto-v1.0-1pct.plans-initial.xml.gz",
-				"--config:vehicles.vehiclesFile=../../../../../shared-svn/projects/matsim-kyoto/data/input/kyoto-v1.0-vehicleTypes.xml",
-				"--config:facilities.inputFacilitiesFile=../../../../../shared-svn/projects/matsim-kyoto/data/input/kyoto-v1.0-facilities.xml",
+//				"--config:vehicles.vehiclesFile=../../../../../shared-svn/projects/matsim-kyoto/data/input/kyoto-v1.0-vehicleTypes.xml",
+				"--config:facilities.inputFacilitiesFile=../../../../../shared-svn/projects/matsim-kyoto/data/input/kyoto-v1.0-facilities.xml.gz",
 				"--iterations=0", "--1pct", "run"};
 //		args = new String [] {"--help"};
 		MATSimApplication.runWithDefaults(OpenKyotoScenario.class, args);
