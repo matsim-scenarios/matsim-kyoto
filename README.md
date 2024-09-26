@@ -1,4 +1,5 @@
-# The MATSim Open Template Scenario
+# The MATSim Open Kyoto Scenario
+
 
 ![Build Status](https://github.com/matsim-scenarios/matsim-scenario-template/workflows/build/badge.svg?branch=main)
 ![license](https://img.shields.io/github/license/matsim-scenarios/matsim-scenario-template.svg)
@@ -8,32 +9,13 @@
 ![MATSim network and agents](https://placehold.co/500x400?text=Image+Placeholder "MATSim network and agents")
 
 
-----
-
-When using this template make sure to adapt it as needed:
-
-- [ ] Rename Run-Class in `src/main/java` folder
-- [ ] Modify config in `input`
-- [ ] Update pom.xml
-  - [ ] Name, description and version
-  - [ ] Main class
-- [ ] Makefile
-- [ ] Update CITATION.cff (Authors and version)
-- [ ] Modify calibration.py in `src/main/python`
-- [ ] Update README.md (This file)
-  - [ ] Change Name and URLs
-  - [ ] Badges
-  - [ ] Remove this TODO list when done
-
-----
-
 ### About this project
 
-This repository provides an open MATSim transport model for [name], provided by the [Transport Systems Planning and Transport Telematics group](https://www.tu.berlin/vsp) of [Technische Universität Berlin](https://www.tu.berlin/).
+This repository provides an open MATSim transport model for Kyoto/Kansai-Region, provided by the [Transport Systems Planning and Transport Telematics group](https://www.tu.berlin/vsp) of [Technische Universität Berlin](https://www.tu.berlin/).
 
 <a rel="TU Berlin" href="https://www.vsp.tu-berlin.de"><img src="https://svn.vsp.tu-berlin.de/repos/public-svn/ueber_uns/logo/TU_BERLIN_Logo_Lang_RGB_SR_rot.svg" width="35%" height="35%"/></a>
 
-This scenario contains a 25pct sample of [name] and its surrounding area; road capacities are accordingly reduced. The scenario is calibrated taking into consideration the traffic counts, modal split and mode-specific trip distance distributions.
+This scenario contains a 10pct sample of Kyoto and its surrounding area; road capacities are accordingly reduced. The scenario is calibrated taking into consideration the traffic counts, modal split and mode-specific trip distance distributions.
 
 ### Licenses
 
@@ -51,7 +33,7 @@ Handling of large files within git is not without problems (git lfs files are no
 ----
 ### Run the MATSim Template scenario
 
-The [name] scenario has a command line interface providing the following options:
+The Open Kyoto scenario has a command line interface providing the following options:
 
 ![Scenario CLI](https://placehold.co/500x300?text=CLI+Placeholder "Scenario CLI")
 
@@ -76,3 +58,13 @@ It can be used by using either of these methods:
     1. For example, one can disable lanes or run the 25pct scenario using the available options
 5. Start this scenario using the default config by running `java -jar matsim-template-1.0.jar`
 6. "Open" the output directory.  You can drag files into VIA as was already done above.
+
+---
+## More information
+
+For more information about MATSim, see here: https://www.matsim.org/
+
+## Internal documentation
+
+Internal documentation can be found here:
+https://docs.google.com/document/d/1G7YFVciCb7DRbZ690URcixgwsVfHNOziSVhCgTbyMEo/edit#heading=h.htwasp8iamei
