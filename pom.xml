@@ -74,6 +74,13 @@
 			<version>${berlin.version}</version>
 		</dependency>
 
+		<!-- pt2matsim for transitSchedule generation -->
+		<dependency>
+			<groupId>org.matsim</groupId>
+			<artifactId>pt2matsim</artifactId>
+			<version>24.4</version>
+		</dependency>
+
 
 		<!-- Include the JUnit testing library.  Not transitive. -->
 		<dependency>
@@ -298,6 +305,12 @@
 		<repository>
 			<id>jitpack.io</id>
 			<url>https://jitpack.io</url>
+		</repository>
+
+		<!-- pt2matsim package, which was used to create the transitSchedule -->
+		<repository>
+			<id>pt2matsim</id>
+			<url>https://repo.matsim.org/repository/matsim/</url>
 		</repository>
 	</repositories>
 
