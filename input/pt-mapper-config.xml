@@ -9,7 +9,7 @@
 		<!-- Path to the input network file. Not needed if PTMapper is called within another class. -->
 		<param name="inputNetworkFile" value="./input/v1.0/kyoto-v1.0-network.xml.gz" />
 		<!-- Path to the input schedule file. Not needed if PTMapper is called within another class. -->
-		<param name="inputScheduleFile" value="./schedule.tmp" />
+		<param name="inputScheduleFile" value="" />
 		<!-- The maximal distance [meter] a link candidate is allowed to have from the stop facility.
 		No link candidates beyond this distance are added. -->
 		<param name="maxLinkCandidateDistance" value="90.0" />
@@ -28,9 +28,9 @@
 		<!-- Defines the number of numOfThreads that should be used for pseudoRouting. Default: 2. -->
 		<param name="numOfThreads" value="2" />
 		<!-- Path to the output network file. Not needed if PTMapper is used within another class. -->
-		<param name="outputNetworkFile" value="./input/ptGen/kyoto-v1.0-network-with-pt.xml.gz" />
+		<param name="outputNetworkFile" value="" />
 		<!-- Path to the output schedule file. Not needed if PTMapper is used within another class. -->
-		<param name="outputScheduleFile" value="./input/ptGen/kyoto-v1.0-schedule-blank.xml.gz" />
+		<param name="outputScheduleFile" value="" />
 		<!-- Path to the output car only network file. The input multimodal map is filtered.
 		Not needed if PTMapper is used within another class. -->
 		<param name="outputStreetNetworkFile" value="" />
