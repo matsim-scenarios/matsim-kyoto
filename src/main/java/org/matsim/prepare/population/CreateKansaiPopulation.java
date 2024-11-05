@@ -83,14 +83,6 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		new CreateKansaiPopulation().execute(args);
 	}
 
-	private static int parseInt(String s) {
-		return s.equals("-") || s.isBlank() ? 0 : Integer.parseInt(s);
-	}
-
-	private static double parseDouble(String s) {
-		return s.equals("-") || s.isBlank() ? 0.0 : Double.parseDouble(s);
-	}
-
 	/**
 	 * Calculate income after tax, for one individual person. For household income this can not be applied.
 	 */
@@ -111,6 +103,14 @@ public class CreateKansaiPopulation implements MATSimAppCommand {
 		// If income is above the highest bracket
 		tax += (income - previousBracket) * TAX_RATES[TAX_RATES.length - 1];
 		return income - tax;
+	}
+
+	private static int parseInt(String s) {
+		return s.equals("-") || s.isBlank() ? 0 : Integer.parseInt(s);
+	}
+
+	private static double parseDouble(String s) {
+		return s.equals("-") || s.isBlank() ? 0.0 : Double.parseDouble(s);
 	}
 
 	@Override
