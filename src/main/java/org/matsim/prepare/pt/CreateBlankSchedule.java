@@ -15,7 +15,6 @@ import picocli.CommandLine;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
@@ -30,21 +29,15 @@ public class CreateBlankSchedule implements MATSimAppCommand {
 	@CommandLine.Option(names = "--osm", description = "Path to the .osm-file", required = true)
 	private Path osmPath;
 
-	@CommandLine.Option(names = "--network", description = "Path to the matsim-network to use", required = true)
-	private Path networkPath;
-
 	@CommandLine.Option(names = "--config", description = "Path to the mapper-config.xml Can be created using the pt2matsim " +
 		"CreateDefaultPTMapperConfig.java. If no config is given, this code will automatically use the default-config for the kyoto-scenario.")
 	private Path configPath;
 
-	@CommandLine.Option(names = "--outSchedule", description = "Path, where to output the blank schedule file.", required = true)
-	private Path scheduleOutPath;
-
-	@CommandLine.Option(names = "--outNetwork", description = "Path, where to output the blank schedule file.", required = true)
+	@CommandLine.Option(names = "--outNetwork", description = "Path, where to output the network file with pt.", required = true)
 	private Path networkOutPath;
 
 	@CommandLine.Option(names = "--outCRS", description = "CRS in which to output the blank schedule file (default=EPSG:32653).", defaultValue = OpenKyotoScenario.CRS)
-	private String CRSOut;
+	private String CRS;
 
 
 	public static void main(String[] args) {
@@ -66,7 +59,7 @@ public class CreateBlankSchedule implements MATSimAppCommand {
 
 		// Start with the transitScheduleGeneration
 		log.info("Starting with osm2transitSchedule transformation...");
-		Osm2TransitSchedule.run(osmPath.toString(), "./schedule.tmp", CRSOut);
+		Osm2TransitSchedule.run(osmPath.toString(), "./schedule.tmp", CRS);
 		log.info("Finished osm2transitSchedule transformation!");
 
 		// Continue by mapping the schedule
@@ -79,7 +72,7 @@ public class CreateBlankSchedule implements MATSimAppCommand {
 		Network network = NetworkUtils.readNetwork(config.getOutputNetworkFile());
 
 		//TODO Add missing modes here (if there are any)
-		for(Link l : network.getLinks().values()){
+		for (Link l : network.getLinks().values()){
 			if (l.getAllowedModes().contains("bus")||
 					l.getAllowedModes().contains("tram")||
 					l.getAllowedModes().contains("train")||
@@ -87,7 +80,7 @@ public class CreateBlankSchedule implements MATSimAppCommand {
 					l.getAllowedModes().contains("subway")||
 					l.getAllowedModes().contains("artificial")){
 				HashSet<String> allowedModes = new HashSet<>(l.getAllowedModes());
-				List.of("bus", "tram", "rail", "light_rail", "subway").forEach(allowedModes::remove);
+				List.of("bus", "tram", "train", "light_train", "subway", "artificial").forEach(allowedModes::remove);
 				allowedModes.add("pt");
 				l.setAllowedModes(allowedModes);
 			}
