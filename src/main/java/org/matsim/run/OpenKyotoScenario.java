@@ -64,7 +64,7 @@ public class OpenKyotoScenario extends MATSimApplication {
 		Activities.addScoringParams(config, true);
 
 		// Required for all calibration strategies
-		for (String subpopulation : List.of("person", "freight", "goodsTraffic", "commercialPersonTraffic", "commercialPersonTraffic_service")) {
+		for (String subpopulation : List.of("person")) {
 			config.replanning().addStrategySettings(
 				new ReplanningConfigGroup.StrategySettings()
 					.setStrategyName(DefaultPlanStrategiesModule.DefaultSelector.ChangeExpBeta)
