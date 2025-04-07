@@ -15,13 +15,14 @@ import org.matsim.prepare.opt.ExtractPlanIndexFromType;
 import org.matsim.prepare.opt.RunCountOptimization;
 import org.matsim.prepare.opt.SelectPlansFromIndex;
 import org.matsim.prepare.population.*;
+import org.matsim.prepare.pt.CreatePtNetwork;
 import org.matsim.run.OpenKyotoScenario;
 import picocli.CommandLine;
 
 @CommandLine.Command(header = ":: Open Kyoto Calibration ::", version = OpenKyotoScenario.VERSION, mixinStandardHelpOptions = true)
 @MATSimApplication.Prepare({
 	MergePopulations.class, CreateKansaiPopulation.class, CreateDailyPlans.class,
-	ExtractFacilityGeoPkg.class, DownSamplePopulation.class,
+	ExtractFacilityGeoPkg.class, DownSamplePopulation.class, CreatePtNetwork.class,
 	CreateNetworkFromSumo.class, CreateTransitScheduleFromGtfs.class,
 	CleanNetwork.class, CreateMATSimFacilities.class, InitLocationChoice.class, FilterRelevantAgents.class,
 	RunActivitySampling.class, MergePlans.class, SplitActivityTypesDuration.class, CleanPopulation.class, CleanAttributes.class,

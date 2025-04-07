@@ -74,6 +74,19 @@
 			<version>${berlin.version}</version>
 		</dependency>
 
+		<!-- pt2matsim for transitSchedule generation -->
+		<dependency>
+			<groupId>org.matsim</groupId>
+			<artifactId>pt2matsim</artifactId>
+			<version>24.4</version>
+			<exclusions>
+				<exclusion>
+					<groupId>org.matsim</groupId>
+					<artifactId>matsim</artifactId>
+				</exclusion>
+			</exclusions>
+		</dependency>
+
 
 		<!-- Include the JUnit testing library.  Not transitive. -->
 		<dependency>
