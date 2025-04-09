@@ -1,5 +1,6 @@
 import pandas as pd
 import xml.etree.ElementTree as ET
+from xml.dom import minidom
 
 # Load CSV data for stop facilities and schedule
 stop_facility_file = r'https://svn.vsp.tu-berlin.de/repos/public-svn/matsim/scenarios/countries/jp/kyoto/data/public_transit/stop_data.csv'
@@ -13,8 +14,8 @@ def create_stop_facilities(csv_file, root):
     for index, row in df.iterrows():
         stop_facility = ET.SubElement(transit_stops, 'stopFacility', {
             'id': str(row['Station_IDs']),
-            'x': str(row['Coordinates'].split(',')[0]),  # Assuming "x,y" format
-            'y': str(row['Coordinates'].split(',')[1]),
+            'x': str(row['Coordinates'].split(',')[1]),  # input data is in "y,x" format
+            'y': str(row['Coordinates'].split(',')[0]),
             'name': row['Station Name'],
             'linkRefId': f"pt_{row['Station_IDs']}",
             'isBlocking': 'false'
@@ -87,9 +88,17 @@ def create_transit_schedule_xml():
     create_stop_facilities(stop_facility_file, root)
     create_transit_schedule(schedule_file, root)
 
-    # Save the XML to a file
-    tree = ET.ElementTree(root)
-    tree.write(r'C:\Users\zhous\Desktop\zhouyh\berlin project\timetable\transit_schedule.xml', encoding='utf-8', xml_declaration=True)
+    # Prettify XML
+    rough_string = ET.tostring(root, 'utf-8')
+    reparsed = minidom.parseString(rough_string)
+    pretty_xml_as_string = reparsed.toprettyxml(indent="  ")
+
+    # Write to file (!!change to your output file path)
+    with open(r'outputfile.xml', 'w', encoding='utf-8') as f:
+        f.write('<?xml version="1.0" encoding="UTF-8"?>\n')  # Ensure only one declaration
+        for line in pretty_xml_as_string.splitlines():
+            if line.strip() and not line.strip().startswith('<?xml'):
+                f.write(line + "\n")
 
 # Call the main function
 create_transit_schedule_xml()
