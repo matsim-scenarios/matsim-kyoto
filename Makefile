@@ -65,19 +65,12 @@ input/$V/$N-$V-network.xml.gz: input/sumo.net.xml
 
 
 input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
-	# FIXME: Adjust GTFS
-
 	$(sc) prepare transit-from-gtfs --network $<\
 	 --output=input/$V\
-	 --name $N-$V --date "2021-08-18" --target-crs $(CRS) \
-	 ../shared-svn/projects/$N/data/20210816_regio.zip\
-	 ../shared-svn/projects/$N/data/20210816_train_short.zip\
-	 ../shared-svn/projects/$N/data/20210816_train_long.zip\
-	 --prefix regio_,short_,long_\
-	 --shp ../shared-svn/projects/$N/data/pt-area/pt-area.shp\
-	 --shp ../shared-svn/projects/$N/data/Bayern.zip\
-	 --shp ../shared-svn/projects/$N/data/germany-area/germany-area.shp\
-
+	 --name $N-$V --date "2024-08-08" --target-crs $(CRS) \
+	 $(kyoto)/data/public_transit/bus_schedule/Kyoto_City_Bus_GTFS-20240726.zip\
+	 $(kyoto)/data/public_transit/bus_schedule/Kyotobus-20240808.zip\
+	 --prefix city_bus_,kyoto_bus_
 
 input/facilities.gpkg: input/kansai.osm.pbf
 	$(sc) prepare facility-shp\
