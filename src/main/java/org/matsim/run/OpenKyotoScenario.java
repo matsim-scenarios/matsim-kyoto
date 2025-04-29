@@ -78,14 +78,15 @@ public class OpenKyotoScenario extends MATSimApplication {
 					.setWeight(0.15)
 					.setSubpopulation(subpopulation)
 			);
+
+			config.replanning().addStrategySettings(
+				new ReplanningConfigGroup.StrategySettings()
+				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.TimeAllocationMutator_ReRoute)
+				.setWeight(0.15)
+				.setSubpopulation(subpopulation)
+			);
 		}
 
-		config.replanning().addStrategySettings(
-			new ReplanningConfigGroup.StrategySettings()
-				.setStrategyName(DefaultPlanStrategiesModule.DefaultStrategy.TimeAllocationMutator)
-				.setWeight(0.15)
-				.setSubpopulation("person")
-		);
 // TODO: modechoice is not calibrated yet
 //		config.replanning().addStrategySettings(
 //			new ReplanningConfigGroup.StrategySettings()

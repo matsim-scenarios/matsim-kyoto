@@ -15,6 +15,7 @@ osmosis := osmosis/bin/osmosis
 sc := java -Xmx$(MEMORY) -XX:+UseParallelGC -cp $(JAR) org.matsim.prepare.RunOpenKyotoCalibration
 
 .PHONY: prepare
+.DELETE_ON_ERROR:
 
 $(JAR):
 	mvn package
@@ -70,28 +71,28 @@ input/$V/kyoto-bus-$V-transitSchedule.xml.gz: input/$V/kyoto-$V-network.xml.gz
 	 --output=input/$V\
 	 --name kyoto-bus-$V --date "2024-08-08" --target-crs $(CRS) \
 	 $(kyoto)/data/public_transit/Kyoto_City_Bus_GTFS-20240726.zip\
-	 $(kyoto)/data/public_transit/bus_schedule/Kyotobus-20240808.zip\
+	 $(kyoto)/data/public_transit/Kyotobus-20240808.zip\
 	 --copy-late-early\
 	 --prefix city_bus_,kyoto_bus_
 
 
 # This step creates network, transit schedule and vehicles at once
 input/$V/kyoto-$V-transitSchedule.xml.gz: input/$V/kyoto-$V-network.xml.gz input/$V/kyoto-bus-$V-transitSchedule.xml.gz
-
-	# Merge the gtfs with the custom create schedule
 	$(sc) prepare merge-transit-schedules\
 		--input-schedules $(word 2,$^) $(kyoto)/data/public_transit/transitSchedule_kinki_v3.0.xml.gz\
 		--output-schedule $@
 
 	$(sc) prepare transit-vehicles\
 		--schedule $@\
-		--transit-vehicles input/$V/kyoto-bus-$V-transitVehicles.xml.gz
-		--output input/$V/kyoto-$V-transitVehicles.xml.gz
+		--transit-vehicles input/$V/kyoto-bus-$V-transitVehicles.xml.gz\
+		--output-vehicles input/$V/kyoto-$V-transitVehicles.xml.gz\
+		--output-schedule $@
 
 	$(sc) prepare transit-network\
-		--network $<
+		--network $<\
 		--schedule $@\
-		--output input/$V/kyoto-$V-network-with-pt.xml.gz
+		--output-network input/$V/kyoto-$V-network-with-pt.xml.gz\
+		--output-schedule $@
 
 
 input/facilities.gpkg: input/kansai.osm.pbf

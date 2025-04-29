@@ -10,10 +10,7 @@ import org.matsim.application.MATSimAppCommand;
 import org.matsim.core.config.ConfigUtils;
 import org.matsim.core.network.NetworkUtils;
 import org.matsim.core.scenario.ScenarioUtils;
-import org.matsim.pt.transitSchedule.api.TransitLine;
-import org.matsim.pt.transitSchedule.api.TransitRoute;
-import org.matsim.pt.transitSchedule.api.TransitRouteStop;
-import org.matsim.pt.transitSchedule.api.TransitScheduleReader;
+import org.matsim.pt.transitSchedule.api.*;
 import org.matsim.pt.utils.CreatePseudoNetworkWithLoopLinks;
 import org.matsim.pt.utils.TransitScheduleValidator;
 import picocli.CommandLine;
@@ -37,8 +34,11 @@ public class PrepareTransitNetwork implements MATSimAppCommand {
 	@CommandLine.Option(names = "--schedule", description = "Input transit schedule file", required = true)
 	private String scheduleFile;
 
-	@CommandLine.Option(names = "--output", description = "Output network file with transit", required = true)
-	private String outputFile;
+	@CommandLine.Option(names = "--output-network", description = "Output network file with transit", required = true)
+	private String outputNetworkFile;
+
+	@CommandLine.Option(names = "--output-schedule", description = "Output transit schedule file", required = true)
+	private String outputScheduleFile;
 
 	public static void main(String[] args) {
 		new PrepareTransitNetwork().execute(args);
@@ -57,6 +57,12 @@ public class PrepareTransitNetwork implements MATSimAppCommand {
 			List<TransitRouteStop> routeStops = route.getStops();
 			if (routeStops.size() < 2) {
 				log.warn("TransitRoute with less than 2 stops found: line {}, route {}", line.getId(), route.getId());
+				toRemove.add(route);
+				continue;
+			}
+
+			if (route.getDepartures().isEmpty()) {
+				log.warn("TransitRoute with no departures found: line {}, route {}", line.getId(), route.getId());
 				toRemove.add(route);
 				continue;
 			}
@@ -142,7 +148,9 @@ public class PrepareTransitNetwork implements MATSimAppCommand {
 			throw new IllegalArgumentException("TransitSchedule and/or Network invalid");
 		}
 
-		NetworkUtils.writeNetwork(network, outputFile);
+		// Write both network and schedule
+		NetworkUtils.writeNetwork(network, outputNetworkFile);
+		new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(outputScheduleFile);
 
 		return 0;
 	}

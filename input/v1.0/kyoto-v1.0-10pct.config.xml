@@ -9,7 +9,7 @@
 		<param name="lastIteration" value="200"/>
 		<param name="overwriteFiles" value="failIfDirectoryExists"/>
 		<param name="runId" value="kyoto-v1.9"/>
-		<param name="outputDirectory" value="./output/kyoto-v6.3-10pct"/>
+		<param name="outputDirectory" value="./output/kyoto-v1.0-10pct"/>
 		<param name="writeEventsInterval" value="100"/>
 		<param name="writePlansInterval" value="100"/>
 		<param name="routingAlgorithmType" value="SpeedyALT"/>
@@ -20,7 +20,7 @@
 		<param name="numberOfThreads" value="16"/>
 	</module>
 	<module name="network">
-		<param name="inputNetworkFile" value="./kyoto-v1.0-network.xml.gz"/>
+		<param name="inputNetworkFile" value="./kyoto-v1.0-network-with-pt.xml.gz"/>
 	</module>
 	<module name="plans">
 		<param name="inputPlansFile" value="./kyoto-v1.0-10pct.plans-initial.xml.gz"/>
@@ -30,9 +30,9 @@
 		<param name="vehiclesFile" value="./kyoto-v1.0-vehicleTypes.xml"/>
 	</module>
 	<module name="transit">
-		<param name="transitScheduleFile" value="null"/>
-		<param name="vehiclesFile" value="null"/>
-		<param name="useTransit" value="false"/>
+		<param name="transitScheduleFile" value="./kyoto-v1.0-transitSchedule.xml.gz"/>
+		<param name="vehiclesFile" value="./kyoto-v1.0-transitVehicles.xml.gz"/>
+		<param name="useTransit" value="true"/>
 	</module>
 	<module name="facilities">
 		<param name="facilitiesSource" value="fromFile"/>
@@ -41,12 +41,6 @@
 	<module name="routing">
 		<param name="networkModes" value="car,truck,freight,ride"/>
 		<param name="accessEgressType" value="accessEgressModeToLink"/>
-<!-- TODO: no real pt configured yet, teleported speed is not calibrated -->
-		<parameterset type="teleportedModeParameters">
-			<param name="beelineDistanceFactor" value="1.3"/>
-			<param name="mode" value="pt"/>
-			<param name="teleportedModeSpeed" value="5.5"/>
-		</parameterset>
 		<parameterset type="teleportedModeParameters">
 			<param name="beelineDistanceFactor" value="1.3"/>
 			<param name="mode" value="bike"/>
