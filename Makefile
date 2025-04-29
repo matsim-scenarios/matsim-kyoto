@@ -58,19 +58,41 @@ input/sumo.net.xml: input/network.osm
 	 --osm-files $< -o=$@
 
 
-input/$V/$N-$V-network.xml.gz: input/sumo.net.xml
+input/$V/kyoto-$V-network.xml.gz: input/sumo.net.xml
 	$(sc) prepare network-from-sumo $< --target-crs $(CRS) --output $@
 
 	$(sc) prepare clean-network $@  --output $@ --modes car,ride,truck --remove-turn-restrictions
 
 
-input/$V/$N-$V-network-with-pt.xml.gz: input/$V/$N-$V-network.xml.gz
+# Create schedule based on the public available gtfs data (bus only)
+input/$V/kyoto-bus-$V-transitSchedule.xml.gz: input/$V/kyoto-$V-network.xml.gz
 	$(sc) prepare transit-from-gtfs --network $<\
 	 --output=input/$V\
-	 --name $N-$V --date "2024-08-08" --target-crs $(CRS) \
-	 $(kyoto)/data/public_transit/bus_schedule/Kyoto_City_Bus_GTFS-20240726.zip\
+	 --name kyoto-bus-$V --date "2024-08-08" --target-crs $(CRS) \
+	 $(kyoto)/data/public_transit/Kyoto_City_Bus_GTFS-20240726.zip\
 	 $(kyoto)/data/public_transit/bus_schedule/Kyotobus-20240808.zip\
+	 --copy-late-early\
 	 --prefix city_bus_,kyoto_bus_
+
+
+# This step creates network, transit schedule and vehicles at once
+input/$V/kyoto-$V-transitSchedule.xml.gz: input/$V/kyoto-$V-network.xml.gz input/$V/kyoto-bus-$V-transitSchedule.xml.gz
+
+	# Merge the gtfs with the custom create schedule
+	$(sc) prepare merge-transit-schedules\
+		--input-schedules $(word 2,$^) $(kyoto)/data/public_transit/transitSchedule_kinki_v3.0.xml.gz\
+		--output-schedule $@
+
+	$(sc) prepare transit-vehicles\
+		--schedule $@\
+		--transit-vehicles input/$V/kyoto-bus-$V-transitVehicles.xml.gz
+		--output input/$V/kyoto-$V-transitVehicles.xml.gz
+
+	$(sc) prepare transit-network\
+		--network $<
+		--schedule $@\
+		--output input/$V/kyoto-$V-network-with-pt.xml.gz
+
 
 input/facilities.gpkg: input/kansai.osm.pbf
 	$(sc) prepare facility-shp\
@@ -79,13 +101,13 @@ input/facilities.gpkg: input/kansai.osm.pbf
 	 --target-crs $(CRS)\
 	 --output $@
 
-input/$V/$N-$V-facilities.xml.gz: input/$V/$N-$V-network.xml.gz input/facilities.gpkg
+input/$V/kyoto-$V-facilities.xml.gz: input/$V/kyoto-$V-network.xml.gz input/facilities.gpkg
 	$(sc) prepare facilities --network $< --shp $(word 2,$^)\
 	 --facility-mapping input/facility_mapping.json\
 	 --output $@
 
 # Static population only contains the home locations
-input/$V/$N-static-$V-10pct.plans.xml.gz: input/facilities.gpkg
+input/$V/kyoto-static-$V-10pct.plans.xml.gz: input/facilities.gpkg
 	$(sc) prepare kansai-population\
 		--input $(kyoto)/data/census_kansai_region.csv\
 		--shp $(kyoto)/data/kansai-region.gpkg\
@@ -96,7 +118,7 @@ input/$V/$N-static-$V-10pct.plans.xml.gz: input/facilities.gpkg
 
 
 # Assigns daily activity chains including locations
-input/$V/$N-activities-$V-10pct.plans.xml.gz: input/$V/$N-static-$V-10pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+input/$V/kyoto-activities-$V-10pct.plans.xml.gz: input/$V/kyoto-static-$V-10pct.plans.xml.gz input/$V/kyoto-$V-facilities.xml.gz input/$V/kyoto-$V-network.xml.gz
 	$(sc) prepare create-daily-plans --input $< --output $@\
 	 --persons src/main/python/table-persons.csv\
   	 --activities src/main/python/table-activities.csv\
@@ -106,7 +128,7 @@ input/$V/$N-activities-$V-10pct.plans.xml.gz: input/$V/$N-static-$V-10pct.plans.
 	 --network $(word 3,$^)\
 
 
-input/$V/$N-$V-10pct.plans-initial.xml.gz: input/$V/$N-activities-$V-10pct.plans.xml.gz input/$V/$N-$V-facilities.xml.gz input/$V/$N-$V-network.xml.gz
+input/$V/kyoto-$V-10pct.plans-initial.xml.gz: input/$V/kyoto-activities-$V-10pct.plans.xml.gz input/$V/kyoto-$V-facilities.xml.gz input/$V/kyoto-$V-network.xml.gz
 
 	$(sc) prepare filter-relevant-agents\
 	 --input $< --output $@\
@@ -131,5 +153,5 @@ input/$V/$N-$V-10pct.plans-initial.xml.gz: input/$V/$N-activities-$V-10pct.plans
 
 
 # Aggregated target for input plans to calibration
-prepare: input/$V/$N-$V-10pct.plans-initial.xml.gz input/$V/$N-$V-network-with-pt.xml.gz
+prepare: input/$V/kyoto-$V-10pct.plans-initial.xml.gz input/$V/kyoto-$V-transitSchedule.xml.gz
 	echo "Done"

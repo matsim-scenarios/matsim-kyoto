@@ -1,4 +1,4 @@
-package org.matsim.prepare;
+package org.matsim.prepare.transit;
 
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -28,13 +28,13 @@ public class MergeTransitSchedules implements MATSimAppCommand {
 	@CommandLine.Option(names = "--input-schedules", description = "Path to input schedules", arity = "2..*", required = true)
 	private List<String> schedules;
 
-	@CommandLine.Option(names = "--input-vehicles", description = "Path to input vehicles", arity = "1..*", required = true)
+	@CommandLine.Option(names = "--input-vehicles", description = "Path to input vehicles", arity = "0..*", required = false)
 	private List<String> vehicles;
 
 	@CommandLine.Option(names = "--output-schedule", description = "Path to output", required = true)
 	private Path outputSchedule;
 
-	@CommandLine.Option(names = "--output-vehicles", description = "Path to output", required = true)
+	@CommandLine.Option(names = "--output-vehicles", description = "Path to output", required = false)
 	private Path outputVehicles;
 
 	public static void main(String[] args) {
@@ -47,6 +47,11 @@ public class MergeTransitSchedules implements MATSimAppCommand {
 		Config config = ConfigUtils.createConfig();
 		Scenario scenario = ScenarioUtils.createScenario(config);
 
+		if (vehicles != null && outputVehicles == null) {
+			log.error("Output vehicles path is required when merging multiple vehicle files.");
+			return 2;
+		}
+
 		// Read all schedules
 		for (String schedulePath : schedules) {
 			log.info("Reading transit schedule file: {}", schedulePath);
@@ -54,17 +59,21 @@ public class MergeTransitSchedules implements MATSimAppCommand {
 			new TransitScheduleReader(scenario).readFile(schedulePath);
 		}
 
-		// Read all vehicles
-		Vehicles mergedVehicles = scenario.getTransitVehicles();
-		for (String vehiclePath : vehicles) {
-			log.info("Reading transit vehicles file: {}", vehiclePath);
-
-			new MatsimVehicleReader.VehicleReader(mergedVehicles).readFile(vehiclePath);
-		}
-
-
 		new TransitScheduleWriter(scenario.getTransitSchedule()).writeFile(outputSchedule.toString());
-		new MatsimVehicleWriter(mergedVehicles).writeFile(outputVehicles.toString());
+
+
+		if (vehicles != null) {
+			// Read all vehicles
+			Vehicles mergedVehicles = scenario.getTransitVehicles();
+
+			for (String vehiclePath : vehicles) {
+				log.info("Reading transit vehicles file: {}", vehiclePath);
+
+				new MatsimVehicleReader.VehicleReader(mergedVehicles).readFile(vehiclePath);
+			}
+
+			new MatsimVehicleWriter(mergedVehicles).writeFile(outputVehicles.toString());
+		}
 
 		return 0;
 	}

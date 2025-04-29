@@ -15,6 +15,9 @@ import org.matsim.prepare.opt.ExtractPlanIndexFromType;
 import org.matsim.prepare.opt.RunCountOptimization;
 import org.matsim.prepare.opt.SelectPlansFromIndex;
 import org.matsim.prepare.population.*;
+import org.matsim.prepare.transit.MergeTransitSchedules;
+import org.matsim.prepare.transit.PrepareTransitNetwork;
+import org.matsim.prepare.transit.PrepareTransitVehicles;
 import org.matsim.run.OpenKyotoScenario;
 import picocli.CommandLine;
 
@@ -27,7 +30,7 @@ import picocli.CommandLine;
 	RunActivitySampling.class, MergePlans.class, SplitActivityTypesDuration.class, CleanPopulation.class, CleanAttributes.class,
 	RunCountOptimization.class, SelectPlansFromIndex.class, ExtractPlanIndexFromType.class, AssignReferencePopulation.class,
 	ExtractRelevantFreightTrips.class, CheckCarAvailability.class, FixSubtourModes.class, ComputeTripChoices.class, ComputePlanChoices.class,
-	ApplyNetworkParams.class, SetCarAvailabilityByAge.class
+	ApplyNetworkParams.class, SetCarAvailabilityByAge.class, MergeTransitSchedules.class, PrepareTransitNetwork.class, PrepareTransitVehicles.class
 })
 public class RunOpenKyotoCalibration extends MATSimApplication {
 
